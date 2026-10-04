@@ -1,77 +1,96 @@
-# DIxAI: Decision-Information Explanations
+# DIxAI-Text
 
-**Official PyTorch Implementation**
-explanations by minimizing the mutual information between the input and the explanation mask while maximizing the mutual information between the masked input and the model's decision.
+Extension of the DIxAI framework (Decision-Information Explanations) to Transformer-based NLP models.
 
-This repository contains the official PyTorch implementation and reproduction scripts for the experiments.
+This repository builds on the official DIxAI implementation by Haythem Ghazouani
+(<https://github.com/haythemghazouani/decision_information_xai>). The original code (vision, tabular, medical
+imaging) is kept, and DIxAI-Text is integrated into it as a new `dixai.text` subpackage.
 
-## 🚀 Key Features
-- **Theoretical Guarantee:** Optimizes the Information Bottleneck objective $I(Y; Z) - \beta I(X; Z)$.
-- **Architecture Agnostic:** Works with CNNs (ResNet, DenseNet, VGG), ViTs, and Tabular MLPs.
-- **High-Fidelity:** Unlike attribution methods (SHAP, Grad-CAM), DIxAI produces executable masks that preserve model decisions with high probability.
-- **Robustness:** Includes built-in mechanisms for total variation regularization and spatial priors.
+Paper: *DIxAI-Text: Extension of the DIxAI Framework to the Explainability of Natural Language Processing Models*
+(Ghazouani, Chaieb, Selmene, Mhiri, Kamel).
 
-## 📦 Installation
+## Overview
 
-```bash
-git clone https://github.com/haythemghazouani/decision_information_xai.git
-cd decision_information_xai
+For a given input text, DIxAI-Text learns a per-token mask on the contextual embeddings of a frozen BERT-style
+classifier (Gumbel-Softmax relaxation), so that the masked input preserves the model decision with as few tokens
+as possible. A sequential Total Variation penalty replaces the spatial one used for images and favors contiguous
+spans. Explanations are evaluated with the ERASER metrics (sufficiency, comprehensiveness) on SST-2 and SNLI,
+against LIME, SHAP, Integrated Gradients, attention and random selection.
+
+## What was added, and where
+
+| Location | Status | Content |
+|---|---|---|
+| `src/dixai/text/` | new | DIxAI-Text subpackage |
+| `src/dixai/text/explainer_text.py` | new | text explainer (instance-wise mask optimization) |
+| `src/dixai/text/masks_text.py` | new | Gumbel-Softmax token-level masks |
+| `src/dixai/text/objective_text.py` | new | objective: sparsity, fidelity, sequential contiguity (TV) |
+| `src/dixai/text/baselines_text.py` | new | baseline embeddings (mean, mask token, pad token) |
+| `src/dixai/text/metrics_text.py` | new | ERASER sufficiency and comprehensiveness |
+| `src/dixai/text/data.py`, `data_snli.py`, `data_eraser.py` | new | text datasets loading (including SNLI and ERASER) |
+| `experiments/text/` | new | `pub_sst2.py`, `pub_snli.py` and their `results/` |
+
+Everything outside these paths is original DIxAI code.
+
+
+## Installation
+
+```
+git clone https://github.com/Eya-mhiri/DIxAI-Text.git
+cd DIxAI-Text
 pip install -e .
+pip install transformers datasets lime shap matplotlib
 ```
 
-## 🧪 Reproducing Experiments
+## Reproducing the DIxAI-Text experiments
 
-This repository includes the scripts used to generate the results for the manuscript.
+All text experiments use N = 50 examples, 3 seeds (0, 1, 2) and S = 200 optimization steps, on CPU.
 
-### 1. Robustness & Stability (Tabular)
-Reproduce the multi-seed stability analysis and baseline comparison on the Iris dataset:
+```
+# SST-2: comparison with the baselines
+python experiments/text/pub_sst2.py
 
-```bash
-# Run Baseline Comparison (DIxAI vs L2X vs Integrated Gradients)
-python experiments/benchmark/bench_tabular_baselines.py
-
-# Run Multi-Seed Statistical Analysis (N=10)
-python experiments/benchmark/bench_robustness.py
+# SNLI: comparison with the baselines (real SNLI loaded through the datasets library)
+python experiments/text/pub_snli.py
 ```
 
-### 2. Faithfulness Benchmarks (ROAR)
-Run the Remove-And-Retrain (ROAR) evaluation to measure degradation curves:
+Ablation and comparison figures for SST-2 and SNLI are saved in `experiments/text/results/`.
+Classifiers: `textattack/bert-base-uncased-SST-2` (SST-2) and `cross-encoder/nli-deberta-v3-small` (SNLI).
 
-```bash
-python experiments/consistency/bench_roar.py
+## Original DIxAI experiments
+
+The vision, tabular and medical experiments of the original framework are in `experiments/benchmark`,
+`experiments/tabular`, `experiments/medical` and `experiments/vision`. See the original repository for their
+description.
+
+## Project structure
+
+```
+src/dixai/            DIxAI library
+src/dixai/text/       DIxAI-Text (this work)
+experiments/          benchmark scripts
+experiments/text/     DIxAI-Text experiments (this work)
+figures/              figures
+scripts/              helper scripts
 ```
 
-### 3. Sanity Checks
-Verify model parameter randomization tests (Adebayo et al.):
+## Citation
 
-```bash
-python experiments/consistency/sanity_checks.py
+If you use the text extension, please cite:
+
+```
+@article{ghazouani2026dixaitext,
+  title={DIxAI-Text: Extension of the DIxAI Framework to the Explainability of Natural Language Processing Models},
+  author={Ghazouani, Haythem and Chaieb, Marouene and Selmene, Sarra and Mhiri, Eya and Kamel, Imen},
+  journal={Preprint},
+  year={2026},
+  url={https://github.com/Eya-mhiri/DIxAI-Text}
+}
 ```
 
-### 4. Medical Domain Validation
-Verify architecture compatibility with DenseNet-121 (CheXpert style):
+and the original framework:
 
-```bash
-python experiments/medical/bench_chexpert_transfer.py
 ```
-
-## 📂 Project Structure
-
-- `src/dixai`: Core library implementation.
-  - `explainer.py`: Main `DecisionInformationExplainer` class.
-  - `masks.py`: Learnable mask implementations (Gumbel-Softmax).
-  - `objective.py`: Information Bottleneck loss functions.
-- `experiments/`: Benchmark scripts.
-  - `benchmark/`: Tabular and baseline comparisons.
-  - `consistency/`: ROAR and Sanity Checks.
-  - `medical/`: Medical imaging validation.
-  - `vision/`: ImageNet/CIFAR visualizations.
-
-## 📜 Citation
-
-If you use this code in your research, please cite:
-
-```bibtex
 @article{ghazouani2026dixai,
   title={DIxAI: Decision-Information Conservation for Explainable AI},
   author={Ghazouani, Haythem},
