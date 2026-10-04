@@ -1,5 +1,5 @@
 """
-pub_sst2.py — VERSION CORRIGÉE (protocole final + timing)
+pub_sst2.py 
 - Comparaison: N=50, steps=200, 3 seeds (aligné sur l'ablation)
 - Préserve l'ablation existante dans le JSON (ne l'écrase plus)
 - Ajoute le chronométrage (temps d'explication + inférence pure)
@@ -26,13 +26,8 @@ device="cpu"
 # --- Ablation (déjà faite, on ne la relance pas) ---
 N=50;STEPS=200;SEEDS=[0,1,2]
 
-# --- Comparaison : PROTOCOLE FINAL, actuellement en MODE TEST ---
-# >>> TEST DE TIMING (étape actuelle) <
-#N_COMP=3;STEPS_COMP=200;SEEDS_COMP=[0]
-#LIME_SAMPLES=500;SHAP_EVALS=200
-# >>> RUN FINAL : remplacer la ligne ci-dessus par : <
 N_COMP=50;STEPS_COMP=200;SEEDS_COMP=[0,1,2]
-LIME_SAMPLES=500;SHAP_EVALS=100   #(ajuster selon résultat du test)
+LIME_SAMPLES=500;SHAP_EVALS=100   
 
 RESULTS_DIR=os.path.join(os.path.dirname(__file__),"..","results")
 os.makedirs(RESULTS_DIR,exist_ok=True)
@@ -212,24 +207,3 @@ with open(RESULTS_FILE,"w") as f:
     json.dump({"ablation":all_abl,"comparison":comp_res,"timing":timing_stats},f,indent=2)
 print(f"\n  Comparison sauvegardée dans {RESULTS_FILE}");sys.stdout.flush()
 
-# ============================================================
-# PARTIE 5 : TABLE LATEX COMPARAISON
-# ============================================================
-print("\n=== TABLE LATEX COMPARAISON ===");sys.stdout.flush()
-method_labels=["Random","Attention","LIME","SHAP","IG","DIxAI-Text"]
-method_keys=["random","attention","lime","shap","integrated_grads","dixai"]
-
-with open(os.path.join(RESULTS_DIR,"table_comparison.tex"),"w") as f:
-    f.write("\\begin{table}[t]\n\\centering\n\\caption{ERASER faithfulness comparison on SST-2 (N=%d, %d seeds).}\n" % (N_COMP,len(SEEDS_COMP)))
-    f.write("\\begin{tabular}{lcc}\n\\toprule\n")
-    f.write("Method & Sufficiency$\\downarrow$ & Comprehensiveness$\\uparrow$ \\\\\n\\midrule\n")
-    for m,name in zip(method_keys,method_labels):
-        s=comp_res.get(m,{}).get("s",[])
-        c=comp_res.get(m,{}).get("c",[])
-        sm=safe_mean(s, default=float("nan")) if s else float("nan")
-        cm_=safe_mean(c, default=float("nan")) if c else float("nan")
-        f.write(f"{name} & {sm:.4f} & {cm_:.4f} \\\\\n")
-    f.write("\\bottomrule\n\\end{tabular}\n\\label{tab:comparison}\n\\end{table}\n")
-print(f"  Table LaTeX sauvée : {RESULTS_DIR}/table_comparison.tex");sys.stdout.flush()
-
-print("\n=== TERMINÉ ===");sys.stdout.flush()
