@@ -1,8 +1,9 @@
 """
-pub_snli.py — VERSION CORRIGÉE (protocole final + timing)
+pub_snli.py
 - Comparaison: N=50, steps=200, 3 seeds
 - FIX : ne saute plus le run si un ancien résultat N=12 existe déjà
 - Ajoute le chronométrage
+- Données : vrai SNLI via dixai.text.data_snli.load_snli
 """
 
 import sys,os,json,time
@@ -18,6 +19,7 @@ import matplotlib.pyplot as plt
 from transformers import AutoTokenizer,AutoModelForSequenceClassification
 from dixai.text import TextDecisionInformationExplainer,TextBaselineProvider
 from dixai.text.metrics_text import compute_eraser_scores
+from dixai.text.data_snli import load_snli
 
 device="cpu"
 
@@ -32,7 +34,7 @@ ANNEAL=True
 #LIME_SAMPLES=500;SHAP_EVALS=200
 # >>> RUN FINAL : remplacer par : <
 N_COMP=50;STEPS_COMP=200;SEEDS_COMP=[0,1,2]
-LIME_SAMPLES=500;SHAP_EVALS=200   (ajuster selon résultat du test)
+LIME_SAMPLES=500;SHAP_EVALS=200   # (ajuster selon résultat du test)
 
 RESULTS_DIR=os.path.join(os.path.dirname(__file__),"..","results")
 os.makedirs(RESULTS_DIR,exist_ok=True)
@@ -67,28 +69,12 @@ with torch.no_grad():
 print(f"[TIMING] Inférence pure (1 forward pass) ≈ {t_infer*1000:.2f} ms");sys.stdout.flush()
 
 # ============================================================
-# Chargement SNLI
+# Chargement SNLI (vrai dataset via data_snli.load_snli)
 # ============================================================
 def load_snli_examples(limit,split,seed):
-    fallback_examples=[
-        {"premise":"A man is playing guitar.","hypothesis":"A person is performing music.","label":0},
-        {"premise":"A dog is running through the grass.","hypothesis":"A dog is outside.","label":0},
-        {"premise":"A woman is cooking in a kitchen.","hypothesis":"A person is preparing food.","label":0},
-        {"premise":"A child is sleeping on a couch.","hypothesis":"A kid is resting.","label":0},
-        {"premise":"Two people are walking on the street.","hypothesis":"People are outside.","label":0},
-        {"premise":"A car is parked near a building.","hypothesis":"A vehicle is parked.","label":0},
-        {"premise":"The cat is sitting on the windowsill.","hypothesis":"A cat is on a ledge.","label":0},
-        {"premise":"A group of students are studying together.","hypothesis":"Students are learning.","label":0},
-        {"premise":"A plane is flying over the ocean.","hypothesis":"An aircraft is in the air.","label":0},
-        {"premise":"The boy is holding a red balloon.","hypothesis":"A child is carrying a balloon.","label":0},
-        {"premise":"A woman is reading a book.","hypothesis":"A person is looking at text.","label":0},
-        {"premise":"A man is riding a bicycle.","hypothesis":"Someone is on a bike.","label":0},
-    ]
-    rng=np.random.default_rng(seed)
-    n=min(limit,len(fallback_examples))
-    indices=rng.choice(len(fallback_examples),size=n,replace=False).tolist()
-    exs=[fallback_examples[i] for i in indices]
-    print(f"[SNLI] Chargé {len(exs)} exemples locaux ({split}).");sys.stdout.flush()
+    exs_snli=load_snli(limit=limit,split=split,seed=seed)
+    exs=[{"premise":x.premise,"hypothesis":x.hypothesis,"label":x.label} for x in exs_snli]
+    print(f"[SNLI] {len(exs)} exemples prêts ({split}, seed={seed}).");sys.stdout.flush()
     return exs
 
 def get_cm(t,premise,hypothesis,d):
@@ -216,19 +202,3 @@ with open(RESULTS_FILE,"w") as f:
     json.dump({"comparison":comp_res,"timing":timing_stats},f,indent=2)
 print(f"\nSauvegardé dans {RESULTS_FILE}");sys.stdout.flush()
 
-# Table LaTeX
-print("\n=== TABLE LATEX ===");sys.stdout.flush()
-method_labels=["Random","Attention","LIME","SHAP","IG","DIxAI-Text"]
-method_keys=["random","attention","lime","shap","integrated_grads","dixai"]
-with open(os.path.join(RESULTS_DIR,"table_snli_comparison.tex"),"w") as f:
-    f.write("\\begin{table}[H]\n\\centering\n\\caption{ERASER faithfulness metrics on SNLI (N=%d, %d seeds).}\n" % (N_COMP,len(SEEDS_COMP)))
-    f.write("\\begin{tabular}{lcc}\n\\toprule\nMethod & Sufficiency$\\downarrow$ & Comprehensiveness$\\uparrow$ \\\\\n\\midrule\n")
-    for m,name in zip(method_keys,method_labels):
-        s=comp_res.get(m,{}).get("s",[])
-        c=comp_res.get(m,{}).get("c",[])
-        sm=f"{np.mean(s):.4f}" if s else "n/a"
-        cm_=f"{np.mean(c):.4f}" if c else "n/a"
-        f.write(f"{name} & {sm} & {cm_} \\\\\n")
-    f.write("\\bottomrule\n\\end{tabular}\n\\end{table}\n")
-print(f"Table sauvée : {RESULTS_DIR}/table_snli_comparison.tex");sys.stdout.flush()
-print("\n=== TERMINÉ ===")
