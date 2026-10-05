@@ -99,5 +99,3 @@ and the original framework:
 }
 ```
 
-## 📄 License
-MIT License.
